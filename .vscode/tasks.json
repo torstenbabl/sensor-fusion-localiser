@@ -7,16 +7,43 @@
     "tasks": [
         {
             "label": "CMake Configure",
-            "command": "echo hello",
+            "command": "cmake",
+            "args": [
+                "-S ./",
+                "-B build/"
+            ],
             "type": "shell",
-            "args": [],
             "problemMatcher": [
-                "$tsc"
+                "$msCompile"
             ],
             "presentation": {
-                "reveal": "always"
+                "reveal": "always",
+                "panel": "dedicated"
             },
-            "group": "build"
+            "group": "build",
+        },
+        {
+            "label": "Copy compile commands",
+            "type": "shell",
+            "command": "cp build/compile_commands.json ./",
+            "problemMatcher": [],
+            "dependsOn" : "CMake Configure"
+        },
+        {
+            "label": "Build All",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "type": "shell",
+            "options": {"cwd": "build/"},
+            "command": "make -j7",
+            "problemMatcher": [],
+            "dependsOn" :[
+                "CMake Configure",
+                "Copy compile commands"
+            ]
+
         }
     ]
 }
