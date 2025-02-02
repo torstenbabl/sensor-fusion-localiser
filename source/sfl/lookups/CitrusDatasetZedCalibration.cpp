@@ -1,5 +1,7 @@
 #include "sfl/lookups/CitrusDatasetZedCalibration.h"
 
+namespace sfl::lookups {
+
 static std::array<double, 9> ROTATION_MATRIX = { 0.9999966,  0.0000034,  0.0026000, \
                                                  0.0000034,  0.9999966, -0.0026000, \
                                                  0.0026000,  0.0026000,  0.9999933 };
@@ -67,4 +69,6 @@ std::array<double, 3> const& CitrusDatasetZedCalibration::getTranslation()
 std::pair<MonoCameraCalibrationIf&, MonoCameraCalibrationIf&> CitrusDatasetZedCalibration::getCameraCalibrations()
 {
   return std::pair<MonoCameraCalibrationIf&, MonoCameraCalibrationIf&>(left, right);
+}
+
 }

@@ -1,3 +1,6 @@
+#ifndef _UTILITIES_PATHSFROMREGEX_H_
+#define _UTILITIES_PATHSFROMREGEX_H_
+
 #include <filesystem>
 #include <regex>
 #include <vector>
@@ -9,3 +12,5 @@ std::vector<std::filesystem::path> pathsFromRegex(
   std::regex pattern   ///< [in] Regulat expression to match files against
 );
 }
+
+#endif // _UTILITIES_PATHSFROMREGEX_H_

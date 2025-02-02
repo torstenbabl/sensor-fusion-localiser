@@ -1,3 +1,4 @@
 add_subdirectory(HelloWorld)
 add_subdirectory(ImuSerialRead)
 add_subdirectory(SingleThreadedVO)
+add_subdirectory(StereoRectification)
