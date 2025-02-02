@@ -1,0 +1,2 @@
+add_executable(TestImuCsvRead main.cpp)
+target_link_libraries(TestImuCsvRead PRIVATE sfl)

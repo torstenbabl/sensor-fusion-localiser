@@ -75,7 +75,7 @@ int main(int argc, char* argv[]) {
   params.base = 0.1198;
   VisualOdometryStereo viso(params);
 
-  std::cout << "timestamp,t_x,t_y,t_z,r_x,r_y,r_z,r_w" << std::endl;
+  std::cout << "sec,nanosec,t_x,t_y,t_z,r_x,r_y,r_z,r_w" << std::endl;
 
   for (uint i = 0; i < std::min(leftImages.size(), rightImages.size() ); i++)
   {
@@ -140,9 +140,6 @@ std::optional<std::pair<uint, uint>> getTimeFromPngFilename(std::string filename
   std::pair<uint, uint> timePair;
   // Regular expression to match the format "text_<int>_<int>.png"
   std::regex pattern(R"((.*)_(\d+)_(\d+)\.png)");
-
-  // Variables to store the extracted integers
-  int num1 = 0, num2 = 0;
 
   // Perform regex matching and extraction
   std::smatch matches;
