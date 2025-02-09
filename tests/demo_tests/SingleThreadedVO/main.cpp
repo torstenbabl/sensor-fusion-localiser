@@ -44,8 +44,8 @@ std::optional<std::pair<uint, uint>> getTimeFromPngFilename(std::string filename
 
 //-----------------------------------------------------------------------------
 int main(int argc, char* argv[]) {
-    // Parse command-line flags
-    gflags::ParseCommandLineFlags(&argc, &argv, true);
+  // Parse command-line flags
+  gflags::ParseCommandLineFlags(&argc, &argv, true);
 
   // Enumerate right and left png channels
   // PngFileReaders for left and right channels

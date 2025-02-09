@@ -1,0 +1,7 @@
+#ifndef __SFL_APPLICATIONS_VISUALINERTIALODOMETRY_MAIN_H__
+#define __SFL_APPLICATIONS_VISUALINERTIALODOMETRY_MAIN_H__
+#include <filesystem>
+
+bool checkFilesExist(std::filesystem::path datadir);
+
+#endif // __SFL_APPLICATIONS_VISUALINERTIALODOMETRY_MAIN_H__

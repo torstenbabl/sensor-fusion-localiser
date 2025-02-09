@@ -1,0 +1,9 @@
+add_executable(VisualInertialOdometry main.cpp)
+target_link_libraries(VisualInertialOdometry PRIVATE sfl)
+target_link_libraries (VisualInertialOdometry PRIVATE gflags)
+
+target_link_libraries(VisualInertialOdometry PRIVATE Boost::program_options)
+target_link_libraries(VisualInertialOdometry PRIVATE Boost::serialization)
+target_link_libraries(VisualInertialOdometry PRIVATE TBB::tbb)
+target_link_libraries (VisualInertialOdometry PRIVATE Eigen3::Eigen)
+target_link_libraries (VisualInertialOdometry PRIVATE gtsam)
