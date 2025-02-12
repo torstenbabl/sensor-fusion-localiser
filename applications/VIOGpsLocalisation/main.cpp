@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <ostream>
 #include <utility>
 	
 
@@ -110,7 +111,7 @@ Pose3 csvVoToPose3(RosTimedT3D const* vo);
 /// @details Advances gpsIterator to the point associated with the returned rotation
 /// @return Rot3 of the rotation within ENU
 std::pair<Rot3, std::vector<RosTimedGps>::iterator> initialRotationInEnu(
-  std::vector<RosTimedGps> gpsVector ///< [in,out] vector of GpsReadings from which to calulate the inital heading.
+  std::vector<RosTimedGps>& gpsVector ///< [in,out] vector of GpsReadings from which to calulate the inital heading.
 );
 
 int main(int argc, char* argv[])
@@ -129,7 +130,7 @@ int main(int argc, char* argv[])
 
   std::vector<RosTimedT3D> rawVoTransforms = readVoTransformFromCsv(voPath);
   std::vector<RosTimedImu> rawImuSamples = readRosImuFromCsv(imuPath);
-  std::vector<RosTimedGps> rawGpsReadings = readRosTimedGpsFromCsv(imuPath);
+  std::vector<RosTimedGps> rawGpsReadings = readRosTimedGpsFromCsv(gpsPath);
 
   std::vector<RosTimedT3D>::iterator voIterator = rawVoTransforms.begin();
   std::vector<RosTimedImu>::iterator imuIterator = rawImuSamples.begin(); 
@@ -144,16 +145,26 @@ int main(int argc, char* argv[])
   std::cerr << "Starting heading (z rot in rad): " << initialGpsRotEnu.xyz().z() << std::endl;
   std::cerr << "Starting rotation: " << initialGpsRotEnu << std::endl;
 
+  // Align IMU to VO iterator in time
+  while (gpsIterator->time > voIterator->time)
+  {
+    voIterator++;
+  }
+
   // Point zero timestamp
   std::vector<RosTime> keyFrameTimes;
   keyFrameTimes.push_back(voIterator->time);
 
+  // Set ENU (0, 0) coordinate
+  GeodeticConverter gpsCoordConverter(gpsIterator->data);
+  std::cerr << "Set GPS origin at lat, lon: " << gpsIterator->data.latitude << " " << gpsIterator->data.longitude << std::endl;
+
   // Assemble initial quaternion through GTSAM constructor
   // ::quaternion(w,x,y,z);
-  Rot3 prior_rotation = Rot3::Quaternion(1, 0, 0, 0); // Critical for GPS factors
+  Rot3 prior_rotation = initialGpsRotEnu; // Critical for GPS factors
   Point3 prior_point(0, 0, 0);
   Pose3 prior_pose(prior_rotation, prior_point);
-  Vector3 prior_velocity(0, 0, 0);
+  Vector3 prior_velocity(0, 0, 0); // assume starting from rest
   imuBias::ConstantBias prior_imu_bias;  // assume zero initial bias
 
   Values initial_values;
@@ -191,13 +202,19 @@ int main(int argc, char* argv[])
   auto vo_noise = noiseModel::Diagonal::Sigmas(
     (Vector6() << VO_NOISE_COV, VO_NOISE_COV, VO_NOISE_COV, VO_NOISE_COV, VO_NOISE_COV, VO_NOISE_COV).finished());
 
+  // Constant diagonal covariance given by publichers of citrus dataset
+  auto gpsNoise = noiseModel::Diagonal::Sigmas(
+    (Vector3() << 0.0049, 0.0049, 0.01).finished());
+
   std::cout << "correction_count,key_index,t_x,t_y,t_z,v_x,v_y,v_z,r_x,r_y,r_z,r_w,sec,nanosec" << std::endl;
+
+  // Align IMU to VO iterator in time
   while (voIterator->time > imuIterator->time)
   {
     imuIterator++;
   }
 
-  Pose3 voSinceLastKeyFrame; // Cumulative vo transform between optimisation point
+  Pose3 voSinceLastKeyFrame; // Cumulative vo transform between optimisation points
   // Iterate over data until exhausted
   for (uint voCounter;;voCounter++)
   {
@@ -229,6 +246,29 @@ int main(int argc, char* argv[])
       correction_count++;
       std::cerr << "Correction count: " << correction_count << std::endl;
       keyFrameTimes.push_back(currentVo->time);
+
+      // Decide when to add a GPS factor
+      if (correction_count % 20 == 0)
+      {
+        // Get closest GPS factor to VO time
+        while (currentVo->time > gpsIterator->time)
+        {
+          gpsIterator++;
+          if (gpsIterator == rawGpsReadings.end())
+          {
+            std::cerr << "GPS vector exhausted" << std::endl;
+            break;
+          }
+        }
+
+        Vector3 gpsEnu = gpsCoordConverter.relativeENUto(gpsIterator->data);
+
+        GPSFactor gnss_factor(X(correction_count), gpsEnu, gpsNoise);
+        graph->add(gnss_factor);
+
+        std::cerr << "Adding GPS factor at lat, lon: " << gpsIterator->data.latitude << " " << gpsIterator->data.longitude << std::endl;
+        std::cerr << "Adding GPS factor at ENU: " << gpsEnu.transpose() << std::endl;
+      }
 
       // Add the VO factor
       BetweenFactor<Pose3> vo_factor(X(correction_count - 1), X(correction_count), voSinceLastKeyFrame,vo_noise);
@@ -329,7 +369,7 @@ Pose3 csvVoToPose3(RosTimedT3D const* vo)
 }
 
 std::pair<Rot3, std::vector<RosTimedGps>::iterator> initialRotationInEnu(
-  std::vector<RosTimedGps> gpsVector
+  std::vector<RosTimedGps>& gpsVector
 )
 {
   uint const LOOK_AHEAD = 10;
