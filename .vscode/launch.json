@@ -11,6 +11,14 @@
       "program": "${workspaceFolder}/build/applications/VIOGpsLocalisation/VIOGpsLocalisation",
       "args": [],
       "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "VIO",
+      "program": "${workspaceFolder}/build/applications/VisualInertialOdometry/VisualInertialOdometry",
+      "args": ["--use_isam2"],
+      "cwd": "${workspaceFolder}"
     }
   ]
 }

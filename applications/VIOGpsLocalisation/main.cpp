@@ -104,6 +104,7 @@ boost::shared_ptr<PreintegratedCombinedMeasurements::Params> imuParams() {
 
 // Define command-line flags
 DEFINE_string(datadir, "/home/torsten/Documents/masters/citrus_data_set/04_13D_Jackal/", "Directory containing matching vo.csv, imu.csv files");
+DEFINE_bool(use_isam2, false, "Use iSAM2 as the optimiser, otherwise LevenbergMarquardtOptimizer is used.");
 
 Pose3 csvVoToPose3(RosTimedT3D const* vo);
 
@@ -159,6 +160,12 @@ int main(int argc, char* argv[])
   GeodeticConverter gpsCoordConverter(gpsIterator->data);
   std::cerr << "Set GPS origin at lat, lon: " << gpsIterator->data.latitude << " " << gpsIterator->data.longitude << std::endl;
 
+  // iSAM2
+  ISAM2Params parameters;
+  parameters.relinearizeThreshold = 0.01;
+  parameters.relinearizeSkip = 1;
+  std::shared_ptr<ISAM2> isam2 = std::make_shared<ISAM2>(parameters);
+
   // Assemble initial quaternion through GTSAM constructor
   // ::quaternion(w,x,y,z);
   Rot3 prior_rotation = initialGpsRotEnu; // Critical for GPS factors
@@ -180,10 +187,10 @@ int main(int argc, char* argv[])
   auto velocity_noise_model = noiseModel::Isotropic::Sigma(3, 0.1);  // m/s
   auto bias_noise_model = noiseModel::Isotropic::Sigma(6, 1e-3);
 
-  std::shared_ptr<NonlinearFactorGraph> graph = std::make_shared<NonlinearFactorGraph>();
-  graph->addPrior(X(correction_count), prior_pose, pose_noise_model);
-  graph->addPrior(V(correction_count), prior_velocity, velocity_noise_model);
-  graph->addPrior(B(correction_count), prior_imu_bias, bias_noise_model);
+  NonlinearFactorGraph graph;
+  graph.addPrior(X(correction_count), prior_pose, pose_noise_model);
+  graph.addPrior(V(correction_count), prior_velocity, velocity_noise_model);
+  graph.addPrior(B(correction_count), prior_imu_bias, bias_noise_model);
 
   auto params = imuParams();
 
@@ -264,7 +271,7 @@ int main(int argc, char* argv[])
         Vector3 gpsEnu = gpsCoordConverter.relativeENUto(gpsIterator->data);
 
         GPSFactor gnss_factor(X(correction_count), gpsEnu, gpsNoise);
-        graph->add(gnss_factor);
+        graph.add(gnss_factor);
 
         std::cerr << "Adding GPS factor at lat, lon: " << gpsIterator->data.latitude << " " << gpsIterator->data.longitude << std::endl;
         std::cerr << "Adding GPS factor at ENU: " << gpsEnu.transpose() << std::endl;
@@ -272,7 +279,7 @@ int main(int argc, char* argv[])
 
       // Add the VO factor
       BetweenFactor<Pose3> vo_factor(X(correction_count - 1), X(correction_count), voSinceLastKeyFrame,vo_noise);
-      graph->add(vo_factor);
+      graph.add(vo_factor);
 
       // Add IMU factor
       auto preint_imu = dynamic_cast<const PreintegratedCombinedMeasurements&>(*preintegrated);
@@ -280,7 +287,7 @@ int main(int argc, char* argv[])
                           X(correction_count), V(correction_count),
                           B(correction_count - 1), B(correction_count), 
                           preint_imu);
-      graph->add(imu_factor);
+      graph.add(imu_factor);
 
       //imu_factor.print();
 
@@ -291,14 +298,24 @@ int main(int argc, char* argv[])
       initial_values.insert(B(correction_count), prev_bias);
 
       // Optimise and print factor graph to stdout
-      // Values result;
-      // isam2->update(*graph, initial_values);
-      // result = isam2->calculateEstimate();
-
-      LevenbergMarquardtParams params;
-      //params.setVerbosityLM("SUMMARY");
-      LevenbergMarquardtOptimizer optimizer(*graph, initial_values, params);
-      Values result = optimizer.optimize();
+      Values result;
+      if (FLAGS_use_isam2)
+      {
+        // iSAM2
+        isam2->update(graph, initial_values);
+        result = isam2->calculateEstimate();
+        // Reset graph and initial estimate for next iteration
+        graph.resize(0);
+        initial_values.clear();
+      }
+      else
+      {
+        // LevenbergMarquardtOptimizer
+        LevenbergMarquardtParams params;
+        //params.setVerbosityLM("SUMMARY");
+        LevenbergMarquardtOptimizer optimizer(graph, initial_values, params);
+        result = optimizer.optimize();
+      }
 
       prev_state = NavState(result.at<Pose3>(X(correction_count)),result.at<Vector3>(V(correction_count)));
       prev_bias = result.at<imuBias::ConstantBias>(B(correction_count));
