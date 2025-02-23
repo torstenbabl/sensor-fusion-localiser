@@ -255,7 +255,7 @@ int main(int argc, char* argv[])
       keyFrameTimes.push_back(currentVo->time);
 
       // Decide when to add a GPS factor
-      if (correction_count % 20 == 0)
+      if (correction_count % 72 == 0)
       {
         // Get closest GPS factor to VO time
         while (currentVo->time > gpsIterator->time)
@@ -298,6 +298,7 @@ int main(int argc, char* argv[])
       initial_values.insert(B(correction_count), prev_bias);
 
       // Optimise and print factor graph to stdout
+      auto start_wall_time = std::chrono::high_resolution_clock::now();
       Values result;
       if (FLAGS_use_isam2)
       {
@@ -316,6 +317,9 @@ int main(int argc, char* argv[])
         LevenbergMarquardtOptimizer optimizer(graph, initial_values, params);
         result = optimizer.optimize();
       }
+      auto end_wall_time = std::chrono::high_resolution_clock::now();
+      std::chrono::duration<double> duration = end_wall_time - start_wall_time;
+      std::cerr << "Optimisation time (ms): " << duration << std::endl;
 
       prev_state = NavState(result.at<Pose3>(X(correction_count)),result.at<Vector3>(V(correction_count)));
       prev_bias = result.at<imuBias::ConstantBias>(B(correction_count));
